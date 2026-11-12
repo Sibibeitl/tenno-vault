@@ -15,7 +15,7 @@
     <header class="topbar">
       <div class="brand-wrap">
         <div class="brand-mark" aria-hidden="true">V</div>
-        <div><p class="eyebrow">INVENTARBEGLEITER</p><h1>Tenno Vault <em id="appVersion">V13</em></h1></div>
+        <div><p class="eyebrow">INVENTARBEGLEITER</p><h1>Tenno Vault <em id="appVersion">V21</em></h1></div>
       </div>
       <button class="icon-button" id="settingsBtn" aria-label="Einstellungen">⚙</button>
     </header>
@@ -97,6 +97,9 @@
             <button class="button secondary" id="relicShotAgainBtn">＋ Noch ein Foto</button>
             <button class="button secondary" id="diagBtn">🔍 Diagnose</button>
           </div>
+          <div class="button-row">
+            <button class="button relic" id="takeOverBtn">⚡ Erkannte übernehmen</button>
+          </div>
           <p class="hint" id="relicPhotoHint">Fotografiere den Belohnungsbildschirm. Du kannst auch mehrere Fotos nacheinander machen.</p>
           <div id="relicThumbs" class="relic-thumbs"></div>
         </section>
@@ -114,7 +117,18 @@
         </section>
 
         <section class="panel">
-          <label for="relicInput">3 · Erkannte Belohnungen – bei Bedarf korrigieren</label>
+          <label>3 · Sammelliste dieser Mission</label>
+          <div class="button-row">
+            <button class="button primary" id="addMissionBtn">＋ Erkannte hinzufügen</button>
+            <button class="button relic" id="valueMissionBtn">⚡ Alle bewerten</button>
+            <button class="button secondary" id="clearMissionBtn">Leeren</button>
+          </div>
+          <p class="hint">Für ganze Missionen: mehrere Fotos nacheinander, dann hier sammeln und bewerten.</p>
+        </section>
+        <div id="missionList" class="relic-result"></div>
+
+        <section class="panel">
+          <label for="relicInput">4 · Erkannte Belohnungen – bei Bedarf korrigieren</label>
           <textarea id="relicInput" rows="5" placeholder="Nach dem Foto erscheinen die erkannten Namen hier."></textarea>
           <div class="button-row">
             <button class="button relic" id="priceAllBtn">⚡ Auswerten</button>
