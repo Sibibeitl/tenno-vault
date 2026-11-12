@@ -79,7 +79,7 @@ function lineMatches(text){
     ranked.sort(function(a,b){return b.score-a.score});
     const top=ranked[0];
     const sharedHere=sharedTokenCount(line,top.item);
-    const minScore=(sharedHere>=2)?55:72;
+    const minScore=(sharedHere>=2)?60:75;
     if(top&&top.score>=minScore&&!used[top.item.slug]){
       used[top.item.slug]=1;
       found.push({name:top.item.name,slug:top.item.slug,line:line,score:top.score});
@@ -115,13 +115,25 @@ function matchByScore(name){
 }
 
 async function loadMarketItems(){
-  const REQ={'de':{Language:'de'},'en':{Language:'en'}};
+  // 1. Versuch: beide Sprachen direkt von Warframe.market
+  const got=await tryRemoteItems();
+  if(got){setSuggestions();logItems('remote');return}
+  // 2. Versuch: mitgelieferte Liste (funktioniert ohne Netz)
+  const local=await tryLocalItems();
+  if(local){setSuggestions();logItems('local');return}
+  // 3. Notfall: kleine eingebaute Liste
+  marketItems=[...builtInItems];
+  setSuggestions();
+  logItems('fallback');
+}
+
+async function tryRemoteItems(){
   try{
-    const r=await fetch('https://api.warframe.market/v2/items',{headers:{Language:'en',Platform:settings.platform||'pc'}});
-    if(!r.ok)throw new Error(r.status);
+    const r=await fetch('https://api.warframe.market/v2/items',{headers:{Language:'de',Platform:settings.platform||'pc'}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
     const body=await r.json();
     const list=Array.isArray(body.data)?body.data:(body.data&&body.data.items);
-    if(!Array.isArray(list))throw new Error('Format');
+    if(!Array.isArray(list)||!list.length)throw new Error('Liste leer');
     marketItems=list.map(function(x){
       const i=x.i18n||{};
       const en=(i.en&&i.en.name)||x.name||String(x.slug||'').replaceAll('_',' ');
@@ -129,13 +141,32 @@ async function loadMarketItems(){
       return {name:en,nameDe:de,slug:x.slug,base:String(x.slug||'').replaceAll('_','-'),price:10};
     }).filter(function(x){return x.name&&x.slug});
     mergeBuiltIns();
-    setSuggestions();
-    console.log('WFM items',marketItems.length);
+    return true;
   }catch(e){
-    marketItems=[...builtInItems];
-    setSuggestions();
-    console.warn('Itemliste nicht geladen, nutze lokale Liste',e);
+    console.warn('Marktliste nicht erreichbar',e);
+    return false;
   }
+}
+
+async function tryLocalItems(){
+  try{
+    const r=await fetch('items.json');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const list=await r.json();
+    if(!Array.isArray(list)||!list.length)throw new Error('Liste leer');
+    marketItems=list.map(function(x){return {name:x.en,nameDe:x.de||x.en,slug:x.slug,base:x.slug.replaceAll('_','-'),price:10}});
+    mergeBuiltIns();
+    return true;
+  }catch(e){
+    console.warn('Lokale Itemliste nicht lesbar',e);
+    return false;
+  }
+}
+
+function logItems(quelle){
+  const box=document.getElementById('itemCountInfo');
+  if(box)box.textContent=marketItems.length+' Items ('+quelle+')';
+  console.log('Itemliste:',marketItems.length,'Quelle:',quelle);
 }
 
 function mergeBuiltIns(){
