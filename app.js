@@ -13,23 +13,60 @@ $$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));$('#settingsBtn').onc
 const normalize=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 function similarity(a,b){a=normalize(a);b=normalize(b);if(!a||!b)return 0;if(a===b)return 100;if(a.includes(b)||b.includes(a))return 88;const aw=a.split(' '),bw=b.split(' ');let hits=0;for(const x of aw)for(const y of bw){if(x===y)hits+=2;else if(x.length>3&&y.length>3&&(x.includes(y)||y.includes(x)))hits+=1}return Math.round(100*hits/(aw.length+bw.length))}
 
-function scoreItem(item,candidates){
+function tokenSet(s){
+  return normalize(s).split(' ').filter(function(t){return t.length>2});
+}
+
+// Bewertet, wie gut eine einzelne Textzeile zu einem Itemnamen passt.
+// Ein Treffer braucht uebereinstimmende Woerter, nicht nur aehnliche Buchstabenfolgen.
+function scoreLine(line,item){
   let best=0;
-  for(const c of candidates){
-    for(const alias of aliasList(item)){
-      const s=similarity(c,alias);
-      if(s>best)best=s;
-    }
+  for(const alias of aliasList(item)){
+    const a=normalize(alias),l=normalize(line);
+    if(!a||!l)continue;
+    if(a===l){best=Math.max(best,100);continue}
+    const at=tokenSet(alias),lt=tokenSet(line);
+    if(!at.length||!lt.length)continue;
+    let hits=0;
+    at.forEach(function(t){
+      if(lt.indexOf(t)>=0)hits+=1;
+      else if(t.length>=5&&lt.some(function(x){return x.length>=5&&(x.indexOf(t)>=0||t.indexOf(x)>=0)}))hits+=0.5;
+    });
+    const ratio=hits/at.length;
+    // eine Zeile darf nicht viel laenger sein als der Itemname, sonst ist es Fliesstext
+    const lengthPenalty=lt.length>at.length+3?0.5:1;
+    const score=Math.round(ratio*100*lengthPenalty);
+    if(score>best)best=score;
   }
   return best;
 }
+
 function bestMatches(text){
-  const lines=text.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(Boolean);
-  const candidates=[].concat(lines,[text]);
-  const scored=marketItems.map(function(item){return {item:item,score:scoreItem(item,candidates)}});
+  const lines=text.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(function(x){return x.length>3});
+  const scored=marketItems.map(function(item){
+    let best=0;
+    lines.forEach(function(line){const s=scoreLine(line,item);if(s>best)best=s});
+    return {item:item,score:best};
+  });
   scored.sort(function(a,b){return b.score-a.score});
   return scored.slice(0,4);
 }
+
+function lineMatches(text){
+  const lines=text.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(function(x){return x.length>3});
+  const found=[],used={};
+  lines.forEach(function(line){
+    const ranked=marketItems.map(function(item){return {item:item,score:scoreLine(line,item)}});
+    ranked.sort(function(a,b){return b.score-a.score});
+    const top=ranked[0];
+    if(top&&top.score>=70&&!used[top.item.slug]){
+      used[top.item.slug]=1;
+      found.push({name:top.item.name,slug:top.item.slug,line:line,score:top.score});
+    }
+  });
+  return found;
+}
+
 function setSuggestions(items=marketItems){const dl=$('#itemSuggestions');dl.innerHTML='';items.forEach(x=>{const o=document.createElement('option');o.value=x.name;dl.appendChild(o)})}
 function slugify(x){return normalize(x).replaceAll(' ','_')}
 function matchItem(name){
@@ -148,6 +185,19 @@ async function readOnePhoto(blob,label){
   return (result.data.text||'');
 }
 
+let lastRawText='';
+function showRawText(){
+  let box=$('#relicRawBox');
+  if(!box){
+    box=document.createElement('details');
+    box.id='relicRawBox';box.className='ocr-details';
+    box.innerHTML='<summary>Gelesenen Text anzeigen</summary><pre id="relicRawPre"></pre>';
+    const anchor=$('#relicResult');
+    anchor.parentNode.insertBefore(box,anchor);
+  }
+  $('#relicRawPre').textContent=lastRawText||'Kein Text gelesen.';
+}
+
 function setRelicStatus(text,cls){
   const box=$('#relicResult');
   if(box)box.innerHTML='<div class="progress-note">'+text+'</div>';
@@ -155,18 +205,8 @@ function setRelicStatus(text,cls){
 
 // Aus dem Rohtext alle Zeilen ziehen, die einem Itemnamen sehr ähnlich sind
 function extractNames(raw){
-  const lines=raw.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(function(x){return x.length>3});
-  const found=[];
-  const scored=bestMatches(raw);
-  scored.forEach(function(s){if(s.score>=42)found.push(s.item.name)});
-  lines.forEach(function(line){
-    const m=bestMatches(line);
-    if(m[0]&&m[0].score>=55){
-      const name=m[0].item.name;
-      if(found.indexOf(name)<0)found.push(name);
-    }
-  });
-  return found;
+  const hits=lineMatches(raw);
+  return hits.map(function(h){return h.name});
 }
 
 async function judgeRelics(){
@@ -251,6 +291,7 @@ async function handleRelicPhotos(files){
     setRelicStatus('Foto '+(i+1)+' von '+list.length+' wird gelesen \\u2026');
     try{
       const raw=await readOnePhoto(f,'Foto '+(i+1));
+      lastRawText=raw;
       const names=extractNames(raw);
       names.forEach(function(n){if(allNames.indexOf(n)<0)allNames.push(n)});
       const box=$('#relicInput');
@@ -261,7 +302,8 @@ async function handleRelicPhotos(files){
     }
   }
   if(!allNames.length){
-    setRelicStatus('Keine Belohnungsnamen sicher erkannt. Bitte Namen von Hand eintragen oder schärfer fotografieren.');
+    showRawText();
+    setRelicStatus('Keine Belohnung sicher erkannt. Prüfe unten den gelesenen Text und tippe die Namen gegebenenfalls selbst ein.');
     return;
   }
   await judgeRelics();

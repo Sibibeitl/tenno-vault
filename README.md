@@ -1,19 +1,26 @@
-# Tenno Vault V5
+# Tenno Vault V6
 
-## Was neu ist
+## Fehlerbehebung
 
-- Der Timer ist entfernt. Der Ablauf ist jetzt: Foto machen -> kurze Wartezeit -> Ergebnis mit dem wertvollsten Gegenstand.
-- Erkennung versteht deutsche UND englische Itemnamen. Beim Laden werden beide Namen aus der Warframe.market-Itemliste geholt, OCR laeuft mit englischen und deutschen Sprachdaten.
-- Preisermittlung mit Ausreisser-Schutz: bei mindestens drei Angeboten wird der zweitniedrigste Preis genommen, damit ein einzelnes Billigangebot das Ergebnis nicht verzerrt.
+Die vorige Fassung verglich den kompletten OCR-Rohtext mit allen Itemnamen. Bei Screenshots mit viel Text reichte eine zufaellige Buchstabenfolge fuer einen Treffer, und bei Gleichstand gewann immer der erste Listeneintrag. Ergebnis: Es wurde immer derselbe Gegenstand angezeigt, der gar nicht im Bild war.
 
-## Bedienung im Relikt-Modus
+Jetzt gilt:
 
-1. Belohnungsbildschirm fotografieren (auch mehrere Fotos nacheinander moeglich).
-2. Die erkannten Namen erscheinen im Textfeld und koennen korrigiert werden.
-3. Die App wertet aus und zeigt oben den wertvollsten Gegenstand.
+- Nur einzelne Textzeilen werden bewertet, nie der ganze Rohtext.
+- Ein Treffer braucht uebereinstimmende Woerter, nicht nur aehnliche Buchstaben.
+- Eine Zeile, die viel laenger ist als ein Itemname, wird abgewertet.
+- Unter 70 Prozent Uebereinstimmung gilt ein Gegenstand als nicht erkannt.
+- Es gibt keine Notfalltreffer mehr. Lieber kein Ergebnis als ein falsches.
+- Der gelesene Text ist aufklappbar einsehbar, damit Fehler nachvollziehbar sind.
+
+## Bedienung
+
+1. Im Tab Relikte auf "Belohnungen fotografieren".
+2. Erkannte Namen erscheinen im Textfeld und koennen korrigiert werden.
+3. Die App zeigt oben den wertvollsten Gegenstand.
 
 ## Grenzen
 
-- Die Auswertung stuetz sich auf die guenstigsten Verkaufsangebote. Der angezeigte Preis ist eine Schaetzung, kein garantierter Verkaufspreis.
-- Bei sehr unscharfen Fotos kann die Erkennung Namen verwechseln. Das Textfeld bleibt deshalb immer editierbar.
-- Anfragen laufen gedrosselt (340 ms Abstand), um das Limit von 3 pro Sekunde einzuhalten.
+- Der erkannte Text sollte immer kurz geprueft werden.
+- Preise sind die guenstigsten Verkaufsangebote, keine Verkaufsgarantie.
+- Anfragen laufen gedrosselt (340 ms), Limit sind 3 pro Sekunde.
