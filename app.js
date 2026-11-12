@@ -90,28 +90,28 @@ function lineMatches(text){
 
 function setSuggestions(items=marketItems){const dl=$('#itemSuggestions');dl.innerHTML='';items.forEach(x=>{const o=document.createElement('option');o.value=x.name;dl.appendChild(o)})}
 function slugify(x){return normalize(x).replaceAll(' ','_')}
-function matchItem(name){
+// Eine einzige Zuordnung fuer alle Wege: Foto, Suchfeld, Handeingabe.
+// Unter der Schwelle gibt es kein Ergebnis - lieber nichts als etwas Falsches.
+function findItem(name,minScore){
+  const limit=minScore||60;
   const n=normalize(name);
   if(!n)return null;
-  let hit=marketItems.find(function(x){return normalize(x.name)===n||normalize(x.nameDe||'')===n});
-  if(!hit)hit=marketItems.find(function(x){
-    const a=normalize(x.name),b=normalize(x.nameDe||'');
-    return (a.indexOf(n)>=0||n.indexOf(a)>=0||b.indexOf(n)>=0||n.indexOf(b)>=0)&&n.length>4;
+  const exact=marketItems.find(function(x){
+    return normalize(x.name)===n||normalize(x.nameDe||'')===n;
   });
-  if(!hit)hit=matchByScore(name);
-  if(!hit)return null;
-  return hit;
-}
-
-// Letzter Versuch: ueber die Wortbewertung, aber nur bei klarem Treffer
-function matchByScore(name){
+  if(exact)return {item:exact,score:100};
   let best=null;
   marketItems.forEach(function(item){
     const sc=scoreLine(name,item);
     if(!best||sc>best.score)best={item:item,score:sc};
   });
-  if(best&&best.score>=70)return best.item;
+  if(best&&best.score>=limit)return best;
   return null;
+}
+
+function matchItem(name){
+  const hit=findItem(name,60);
+  return hit?hit.item:null;
 }
 
 async function loadMarketItems(){
@@ -176,7 +176,28 @@ function mergeBuiltIns(){
 
 // Deutsche Bezeichnung des aktuellen Marktsprache-Eintrags, falls vorhanden
 function aliasList(item){return [item.name,item.nameDe].filter(Boolean)}
-function showResult(name){if(!name.trim()){toast('Bitte einen Gegenstand eingeben');return}current=matchItem(name);$('#resultName').textContent=current.name;$('#resultSlug').textContent=current.slug;$('#resultInitial').textContent=current.name[0].toUpperCase();$('#priceInput').value=current.price||10;$('#resultPrice').textContent=current.price||10;$('#quantityInput').value=1;$('#notesInput').value='';$('#marketLink').href=`https://warframe.market/items/${current.slug}?type=sell`;$('#overframeLink').href=`https://overframe.gg/items/all/?q=${encodeURIComponent(current.base.replaceAll('-',' '))}`;go('result')}
+function showResult(name){
+  if(!name||!name.trim()){toast('Bitte einen Gegenstand eingeben');return}
+  const hit=findItem(name,60);
+  if(!hit){
+    toast('Kein Gegenstand gefunden: '+name.trim());
+    const box=$('#relicResult');
+    if(box)box.innerHTML='<div class="progress-note">Nicht gefunden: '+name.trim()+'</div>';
+    return;
+  }
+  current=hit.item;
+  current.price=current.price||10;
+  $('#resultName').textContent=current.name;
+  $('#resultSlug').textContent=current.slug;
+  $('#resultInitial').textContent=current.name[0].toUpperCase();
+  $('#priceInput').value=current.price;
+  $('#resultPrice').textContent=current.price;
+  $('#quantityInput').value=1;
+  $('#notesInput').value='';
+  $('#marketLink').href='https://warframe.market/items/'+current.slug+'?type=sell';
+  $('#overframeLink').href='https://overframe.gg/items/all/?q='+encodeURIComponent(current.base.replaceAll('-',' '));
+  go('result');
+}
 
 function preprocessImage(file){
   return new Promise(function(resolve,reject){
@@ -315,8 +336,12 @@ async function judgeRelics(){
   for(let i=0;i<raw.length;i++){
     box.innerHTML='<div class="progress-note">Preise werden geprüft \\u2026 ('+(i+1)+'/'+raw.length+')</div>';
     const item=matchItem(raw[i]);
-    const p=await fetchTopPrice(item);
-    rows.push({name:raw[i],shown:item.name,slug:item.slug,price:p.price,source:p.source,error:p.error});
+    if(!item){
+      rows.push({name:raw[i],shown:'',slug:'',price:null,source:'unbekannt',error:'Nicht in der Itemliste'});
+    }else{
+      const p=await fetchTopPrice(item);
+      rows.push({name:raw[i],shown:item.name,slug:item.slug,price:p.price,source:p.source,error:p.error});
+    }
     await new Promise(function(r){setTimeout(r,340)});
   }
   const withPrice=rows.filter(function(r){return r.price});
