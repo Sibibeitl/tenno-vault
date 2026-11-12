@@ -372,3 +372,57 @@ $('#addToSessionBtn').onclick=function(){addToSession($('#recognizedName').value
 $('#anotherPhotoBtn').onclick=function(){$('#cameraInput').click()};
 $('#sessionClear').onclick=function(){session=[];toast('Geleert')};
 renderThumbs();
+
+// ===== Diagnose und Handeingabe =====
+let diagBusy=false;
+
+async function runDiagnosis(file){
+  const box=$('#relicResult');
+  box.innerHTML='<div class="progress-note">Diagnose läuft. Das kann einen Moment dauern.</div>';
+  try{
+    const processed=await preprocessImage(file);
+    const worker=await Tesseract.createWorker('eng+deu',1,{
+      workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+      corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',
+      langPath:'https://tessdata.projectnaptha.com/4.0.0'
+    });
+    const result=await worker.recognize(processed);
+    await worker.terminate();
+    const raw=result.data.text||'';
+    const words=(result.data.words||[]);
+    const lines=raw.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(Boolean);
+    const fns=marketItems.length;
+    let list='';
+    lines.forEach(function(l,i){
+      const scored=marketItems.map(function(it){return {item:it,score:scoreLine(l,it)}});
+      scored.sort(function(a,b){return b.score-a.score});
+      const t=scored[0];
+      const sh=t?sharedTokenCount(l,t.item):0;
+      const thr=(sh>=2)?55:72;
+      list+='<span class="diag-line">'+l+' &rarr; <b>'+(t?t.item.name:'-')+'</b> '+Math.round(t?t.score:0)+'% (Wörter: '+sh+', nötig: '+thr+')</span>';
+    });
+    box.innerHTML='<div class="diag-box"><h4>Diagnose</h4>'
+      +'<p style="font-size:11px;color:#82a0af;margin:0 0 8px">Itemliste: '+fns+' Einträge · OCR-Wörter: '+words.length+'</p>'
+      +'<p style="font-size:11px;color:#82a0af;margin:0 0 8px">Gefundene Zeilen: '+lines.length+'</p>'
+      +(list||'<span class="diag-line">Keine Textzeilen gefunden.</span>')
+      +'</div>';
+    const box2=document.createElement('details');
+    box2.className='ocr-details';
+    box2.innerHTML='<summary>Rohtext der Erkennung</summary><pre></pre>';
+    box2.querySelector('pre').textContent=raw||'(leer)';
+    box.appendChild(box2);
+  }catch(e){
+    box.innerHTML='<div class="progress-note" style="color:#ff9aa6">Diagnose fehlgeschlagen: '+(e.message||e)+'</div>';
+  }
+}
+
+async function priceManual(){
+  const vals=[].slice.call(document.querySelectorAll('.manual-name')).map(function(i){return i.value.trim()}).filter(Boolean);
+  if(!vals.length){toast('Bitte mindestens einen Namen eintragen');return}
+  $('#relicInput').value=vals.join(String.fromCharCode(10));
+  await judgeRelics();
+}
+
+$('#diagBtn').onclick=function(){$('#diagInput').click()};
+$('#diagInput').onchange=function(e){const f=e.target.files[0];if(f)runDiagnosis(f)};
+$('#manualPriceBtn').onclick=priceManual;
