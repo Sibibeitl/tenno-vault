@@ -1,0 +1,17 @@
+{
+  "name": "Tenno Vault - Warframe Inventar",
+  "short_name": "Tenno Vault",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#06111c",
+  "theme_color": "#07121d",
+  "description": "Lokaler Warframe Inventar- und Marktassistent",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

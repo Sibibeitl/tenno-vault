@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#07121d" />
+  <meta name="description" content="Lokaler Warframe Inventar- und Marktassistent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Tenno Vault</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-wrap">
+        <div class="brand-mark" aria-hidden="true">V</div>
+        <div><p class="eyebrow">INVENTARBEGLEITER</p><h1>Tenno Vault</h1></div>
+      </div>
+      <button class="icon-button" id="settingsBtn" aria-label="Einstellungen">⚙</button>
+    </header>
+
+    <main>
+      <section id="homeView" class="view active">
+        <article class="hero-card">
+          <div class="hero-copy">
+            <span class="pill">LOKAL & PRIVAT</span>
+            <h2>Was liegt in deinem Arsenal?</h2>
+            <p>Foto aufnehmen, Gegenstand bestätigen und Marktwert prüfen - ohne Zugriff auf dein Spielkonto.</p>
+          </div>
+          <div class="scanner-art" aria-hidden="true"><div class="scan-ring"></div><div class="scan-line"></div></div>
+          <div class="hero-actions">
+            <label class="button primary camera-button">📷 Gegenstand scannen<input id="cameraInput" type="file" accept="image/*" capture="environment" hidden></label>
+            <button class="button secondary" id="manualBtn">⌨ Manuell suchen</button>
+            <button class="button relic" id="relicBtn">⚡ Relikt-Belohnungen vergleichen</button>
+          </div>
+        </article>
+
+        <div class="section-head"><h3>Dein Überblick</h3><button class="text-button" data-go="inventory">Alle anzeigen</button></div>
+        <section class="stats-grid">
+          <article class="stat"><span>GEGENSTÄNDE</span><strong id="itemCount">0</strong><small>im Inventar</small></article>
+          <article class="stat accent"><span>SCHÄTZWERT</span><strong><span id="totalValue">0</span> <em>p</em></strong><small>auf Basis deiner Preise</small></article>
+        </section>
+
+        <div class="section-head"><h3>Zuletzt hinzugefügt</h3></div>
+        <div id="recentList" class="item-list"></div>
+      </section>
+
+      <section id="scanView" class="view">
+        <div class="view-title"><button class="back" data-go="home">←</button><div><p class="eyebrow">ERKENNUNG</p><h2>Foto prüfen</h2></div></div>
+        <div class="session-bar"><span id="sessionCount">0 aufgenommen</span><button class="text-button" id="sessionClear">Leeren</button></div>
+        <div id="previewWrap" class="preview-wrap"><img id="previewImage" alt="Aufgenommenes Gegenstandsbild" /><div class="focus-frame"></div></div>
+        <div id="sessionStrip" class="session-strip"></div>
+        <div class="panel">
+          <label for="recognizedName">Erkannter Gegenstand</label>
+          <input id="recognizedName" list="itemSuggestions" placeholder="z. B. Glaive Prime Blueprint" autocomplete="off" />
+          <datalist id="itemSuggestions"></datalist>
+          <div id="ocrStatus" class="ocr-status" aria-live="polite"><span class="spinner" hidden></span><span id="ocrStatusText">Nach der Bildauswahl startet die Erkennung automatisch.</span></div>
+          <details class="ocr-details"><summary>Erkannten Rohtext anzeigen</summary><pre id="ocrRawText">Noch kein Text erkannt.</pre></details>
+          <div class="button-row">
+            <button class="button primary" id="lookupBtn">Markt prüfen</button>
+            <button class="button secondary" id="addToSessionBtn">+ Sammlung</button>
+            <button class="button secondary" id="anotherPhotoBtn">📷 Nächstes Foto</button>
+            <button class="button relic" id="sessionPriceBtn">⚡ Sammlung bewerten</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="resultView" class="view">
+        <div class="view-title"><button class="back" data-go="home">←</button><div><p class="eyebrow">MARKTCHECK</p><h2>Gegenstand</h2></div></div>
+        <article class="result-card">
+          <div class="item-icon" id="resultInitial">G</div>
+          <div class="result-main"><span class="pill tradeable">HANDELBAR</span><h2 id="resultName">Glaive Prime Blueprint</h2><p id="resultSlug">glaive_prime_blueprint</p></div>
+          <div class="price-block"><span>DEIN SCHÄTZWERT</span><strong><span id="resultPrice">25</span> <em>Platin</em></strong><small>Manuell anpassbar</small></div>
+        </article>
+        <section class="panel form-grid">
+          <div><label for="priceInput">Preis pro Stück</label><input id="priceInput" type="number" min="1" value="25" /></div>
+          <div><label for="quantityInput">Menge</label><input id="quantityInput" type="number" min="1" value="1" /></div>
+          <label class="wide" for="notesInput">Notiz</label><input class="wide" id="notesInput" placeholder="z. B. vollständig, Rang 0" />
+          <button class="button primary wide" id="saveItemBtn">+ Zum Inventar hinzufügen</button>
+        </section>
+        <section class="link-stack">
+          <a id="marketLink" class="link-card market" target="_blank" rel="noopener"><span class="link-logo">M</span><span><strong>Auf Warframe.market ansehen</strong><small>Preise vergleichen und selbst einstellen</small></span><b>↗</b></a>
+          <a id="overframeLink" class="link-card overframe" target="_blank" rel="noopener"><span class="link-logo">O</span><span><strong>Builds auf Overframe</strong><small>Beliebte Builds für das Basis-Item</small></span><b>↗</b></a>
+        </section>
+        <p class="disclaimer">Die App erstellt keine automatischen Angebote und greift nicht auf Warframe zu.</p>
+      </section>
+
+      <section id="relicView" class="view">
+        <div class="view-title"><button class="back" data-go="home">←</button><div><p class="eyebrow">IN 5 SEKUNDEN</p><h2>Belohnungen vergleichen</h2></div></div>
+        <div class="timer-card" id="timerCard"><span id="timerValue">5,0 s</span><small>ZEIT BIS ZUR AUSWAHL</small>
+          <div class="timer-meta"><label>Gruppengröße<select id="squadSize"><option value="1">1 Spieler</option><option value="4" selected>4 Spieler</option></select></label></div>
+          <div class="button-row center"><button class="button primary small" id="startTimerBtn">Timer starten</button><button class="button secondary small" id="resetTimerBtn">Zurücksetzen</button></div>
+        </div>
+        <section class="panel">
+          <label for="relicInput">Gegenstände eintragen – einer pro Zeile</label>
+          <textarea id="relicInput" rows="5" placeholder="Galvanized Hell&#10;Volt Prime Set&#10;Primed Flow"></textarea>
+          <div class="button-row">
+            <button class="button primary" id="priceAllBtn">Preise abrufen</button>
+            <button class="button secondary" id="addRelicPhotoBtn">📷 Foto hinzufügen</button>
+          </div>
+          <p class="hint">Es werden die günstigsten aktuellen Verkaufsangebote abgefragt. Die Auswahl selbst triffst du im Spiel.</p>
+        </section>
+        <div id="relicResult" class="relic-result"></div>
+      </section>
+
+      <section id="inventoryView" class="view">
+        <div class="view-title"><div><p class="eyebrow">SAMMLUNG</p><h2>Mein Inventar</h2></div><button class="icon-button" id="exportBtn" aria-label="Inventar exportieren">⇩</button></div>
+        <div class="searchbox">⌕ <input id="inventorySearch" placeholder="Inventar durchsuchen" /></div>
+        <div id="inventoryList" class="item-list inventory-list"></div>
+      </section>
+
+      <section id="settingsView" class="view">
+        <div class="view-title"><button class="back" data-go="home">←</button><div><p class="eyebrow">APP</p><h2>Einstellungen</h2></div></div>
+        <section class="panel settings-list">
+          <label>Plattform<select id="platformSelect"><option value="pc">PC / Crossplay</option><option value="ps4">PlayStation</option><option value="xbox">Xbox</option><option value="switch">Switch</option><option value="mobile">Mobile</option></select></label>
+          <button class="setting-row" id="loadDemoBtn"><span>Demo-Inventar laden</span><b>→</b></button>
+          <button class="setting-row danger" id="clearBtn"><span>Lokale Daten löschen</span><b>×</b></button>
+        </section>
+        <article class="safety-note"><strong>Datenschutz</strong><p>Fotos und Inventar werden in dieser Demo nur auf deinem Gerät verarbeitet bzw. gespeichert. Es gibt kein Warframe-Login.</p></article>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-go="home"><span>⌂</span>Start</button>
+      <button class="nav-scan" id="navScan" aria-label="Scannen">＋</button>
+      <button class="nav-item" data-go="relic"><span>⚡</span>Relikte</button>
+      <button class="nav-item" data-go="inventory"><span>▦</span>Inventar</button>
+    </nav>
+  </div>
+
+  <div class="modal-backdrop" id="manualModal" hidden>
+    <section class="modal">
+      <button class="modal-close" id="closeModal">×</button><p class="eyebrow">SCHNELLSUCHE</p><h2>Gegenstand eingeben</h2>
+      <input id="manualName" list="itemSuggestions" placeholder="Name des Gegenstands" />
+      <button class="button primary full" id="manualLookup">Weiter</button>
+    </section>
+  </div>
+  <div id="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <input id="relicCameraInput" type="file" accept="image/*" capture="environment" hidden />
+  <script src="app.js"></script>
+</body>
+</html>
