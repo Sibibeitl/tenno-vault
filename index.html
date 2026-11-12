@@ -32,7 +32,7 @@
           <div class="hero-actions">
             <label class="button primary camera-button">📷 Gegenstand scannen<input id="cameraInput" type="file" accept="image/*" capture="environment" hidden></label>
             <button class="button secondary" id="manualBtn">⌨ Manuell suchen</button>
-            <button class="button relic" id="relicBtn">⚡ Relikt-Belohnungen vergleichen</button>
+            <button class="button relic" id="relicBtn">⚡ Wertvollste Belohnung finden</button>
           </div>
         </article>
 
@@ -86,21 +86,28 @@
         <p class="disclaimer">Die App erstellt keine automatischen Angebote und greift nicht auf Warframe zu.</p>
       </section>
 
-      <section id="relicView" class="view">
-        <div class="view-title"><button class="back" data-go="home">←</button><div><p class="eyebrow">IN 5 SEKUNDEN</p><h2>Belohnungen vergleichen</h2></div></div>
-        <div class="timer-card" id="timerCard"><span id="timerValue">5,0 s</span><small>ZEIT BIS ZUR AUSWAHL</small>
-          <div class="timer-meta"><label>Gruppengröße<select id="squadSize"><option value="1">1 Spieler</option><option value="4" selected>4 Spieler</option></select></label></div>
-          <div class="button-row center"><button class="button primary small" id="startTimerBtn">Timer starten</button><button class="button secondary small" id="resetTimerBtn">Zurücksetzen</button></div>
-        </div>
+            <section id="relicView" class="view">
+        <div class="view-title"><button class="back" data-go="home">←</button><div><p class="eyebrow">BELOHNUNGEN</p><h2>Was ist am wertvollsten?</h2></div></div>
+
         <section class="panel">
-          <label for="relicInput">Gegenstände eintragen – einer pro Zeile</label>
-          <textarea id="relicInput" rows="5" placeholder="Galvanized Hell&#10;Volt Prime Set&#10;Primed Flow"></textarea>
+          <label>1 · Relikte fotografieren</label>
           <div class="button-row">
-            <button class="button primary" id="priceAllBtn">Preise abrufen</button>
-            <button class="button secondary" id="addRelicPhotoBtn">📷 Foto hinzufügen</button>
+            <button class="button primary" id="relicShotBtn">📷 Belohnungen fotografieren</button>
+            <button class="button secondary" id="relicShotAgainBtn">＋ Noch ein Foto</button>
           </div>
-          <p class="hint">Es werden die günstigsten aktuellen Verkaufsangebote abgefragt. Die Auswahl selbst triffst du im Spiel.</p>
+          <p class="hint" id="relicPhotoHint">Fotografiere den Belohnungsbildschirm. Du kannst auch mehrere Fotos nacheinander machen.</p>
+          <div id="relicThumbs" class="relic-thumbs"></div>
         </section>
+
+        <section class="panel">
+          <label for="relicInput">2 · Erkannte Belohnungen – bei Bedarf korrigieren</label>
+          <textarea id="relicInput" rows="5" placeholder="Nach dem Foto erscheinen die erkannten Namen hier."></textarea>
+          <div class="button-row">
+            <button class="button relic" id="priceAllBtn">⚡ Auswerten</button>
+            <button class="button secondary" id="clearRelicBtn">Leeren</button>
+          </div>
+        </section>
+
         <div id="relicResult" class="relic-result"></div>
       </section>
 
@@ -138,7 +145,8 @@
   </div>
   <div id="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <input id="relicCameraInput" type="file" accept="image/*" capture="environment" hidden />
+  <input id="relicCameraInput" type="file" accept="image/*" capture="environment" hidden multiple />
+  <input id="relicGalleryInput" type="file" accept="image/*" hidden multiple />
   <script src="app.js"></script>
 </body>
 </html>
