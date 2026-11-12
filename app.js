@@ -92,15 +92,28 @@ function setSuggestions(items=marketItems){const dl=$('#itemSuggestions');dl.inn
 function slugify(x){return normalize(x).replaceAll(' ','_')}
 function matchItem(name){
   const n=normalize(name);
+  if(!n)return null;
   let hit=marketItems.find(function(x){return normalize(x.name)===n||normalize(x.nameDe||'')===n});
   if(!hit)hit=marketItems.find(function(x){
     const a=normalize(x.name),b=normalize(x.nameDe||'');
-    return a.includes(n)||n.includes(a)||b.includes(n)||n.includes(b);
+    return (a.indexOf(n)>=0||n.indexOf(a)>=0||b.indexOf(n)>=0||n.indexOf(b)>=0)&&n.length>4;
   });
-  if(hit)return hit;
-  const slug=slugify(name);
-  return {name:name.trim(),nameDe:name.trim(),slug:slug,base:slug.replace(/_(blueprint|set|systems|chassis|neuroptics|barrel|receiver|stock|blade|handle)$/,'').replaceAll('_','-'),price:10};
+  if(!hit)hit=matchByScore(name);
+  if(!hit)return null;
+  return hit;
 }
+
+// Letzter Versuch: ueber die Wortbewertung, aber nur bei klarem Treffer
+function matchByScore(name){
+  let best=null;
+  marketItems.forEach(function(item){
+    const sc=scoreLine(name,item);
+    if(!best||sc>best.score)best={item:item,score:sc};
+  });
+  if(best&&best.score>=70)return best.item;
+  return null;
+}
+
 async function loadMarketItems(){
   const REQ={'de':{Language:'de'},'en':{Language:'en'}};
   try{
@@ -144,14 +157,16 @@ function preprocessImage(file){
       const ctx=c.getContext('2d');
       ctx.drawImage(img,0,0,c.width,c.height);
       const d=ctx.getImageData(0,0,c.width,c.height),p=d.data;
+      // Warframe-Belohnungsnamen sind helle Schrift auf dunklem Grund.
+      // Gruen, tuerkis, gelb und weiss werden alle als Schwarz ausgegeben.
       for(let i=0;i<p.length;i+=4){
         const r=p[i],g=p[i+1],bl=p[i+2];
         const mx=Math.max(r,g,bl),mn=Math.min(r,g,bl);
-        const warm=(mx-mn)>45&&r>=g&&g>=bl&&bl<mx*0.82&&(r+g)/2-bl>30;
-        if(warm){p[i]=p[i+1]=p[i+2]=0;continue}
         const luma=0.299*r+0.587*g+0.114*bl;
-        const v=luma>150?255:(luma<75?0:Math.min(255,Math.max(0,(luma-128)*1.9+128)));
-        p[i]=p[i+1]=p[i+2]=v;
+        const bright=luma>115;
+        const saturated=(mx-mn)>55;
+        if(bright&&(saturated||luma>165)){p[i]=p[i+1]=p[i+2]=0;continue}
+        p[i]=p[i+1]=p[i+2]=255;
       }
       ctx.putImageData(d,0,0);
       c.toBlob(resolve,'image/png');
