@@ -1,26 +1,7 @@
-# Tenno Vault V6
+# Tenno Vault V8
 
-## Fehlerbehebung
-
-Die vorige Fassung verglich den kompletten OCR-Rohtext mit allen Itemnamen. Bei Screenshots mit viel Text reichte eine zufaellige Buchstabenfolge fuer einen Treffer, und bei Gleichstand gewann immer der erste Listeneintrag. Ergebnis: Es wurde immer derselbe Gegenstand angezeigt, der gar nicht im Bild war.
-
-Jetzt gilt:
-
-- Nur einzelne Textzeilen werden bewertet, nie der ganze Rohtext.
-- Ein Treffer braucht uebereinstimmende Woerter, nicht nur aehnliche Buchstaben.
-- Eine Zeile, die viel laenger ist als ein Itemname, wird abgewertet.
-- Unter 70 Prozent Uebereinstimmung gilt ein Gegenstand als nicht erkannt.
-- Es gibt keine Notfalltreffer mehr. Lieber kein Ergebnis als ein falsches.
-- Der gelesene Text ist aufklappbar einsehbar, damit Fehler nachvollziehbar sind.
-
-## Bedienung
-
-1. Im Tab Relikte auf "Belohnungen fotografieren".
-2. Erkannte Namen erscheinen im Textfeld und koennen korrigiert werden.
-3. Die App zeigt oben den wertvollsten Gegenstand.
-
-## Grenzen
-
-- Der erkannte Text sollte immer kurz geprueft werden.
-- Preise sind die guenstigsten Verkaufsangebote, keine Verkaufsgarantie.
-- Anfragen laufen gedrosselt (340 ms), Limit sind 3 pro Sekunde.
+- Versionsanzeige oben neben dem Titel (V8), damit du siehst, welche Fassung laeuft.
+- Gelbe/goldene Schrift wird in der Vorverarbeitung gezielt erhalten statt in Graustufen zu verschwinden.
+- Zweizeilige Namen wie 'Bronco Prime' + 'Gehaeuse' werden zusammengefuehrt.
+- Bei zwei gemeinsamen Woertern reichen 55 Prozent Uebereinstimmung statt 72.
+- Findet die App kein Item, stehen die gelesenen Zeilen trotzdem im Textfeld.

@@ -42,6 +42,7 @@ function scoreLine(line,item){
 }
 
 const cleanLine=s=>s.replace(/[\u2022\u00b7\u2605\u2606\u25cf\u25a0:;|>_*"']/g,' ').replace(/\s+/g,' ').trim();
+
 function buildCandidates(text){
   const raw=text.split(String.fromCharCode(10)).map(function(x){return cleanLine(x)})
     .filter(function(x){return x.length>2&&/[a-zA-Z\u00c4\u00d6\u00dc\u00e4\u00f6\u00fc\u00df]/.test(x)});
@@ -52,11 +53,13 @@ function buildCandidates(text){
   }
   return out;
 }
-function sharedTokens(line,item){
+
+function sharedTokenCount(line,item){
   const lt=tokenSet(line);let n=0;
   aliasList(item).forEach(function(al){tokenSet(al).forEach(function(x){if(lt.indexOf(x)>=0)n++})});
   return n;
 }
+
 function bestMatches(text){
   const lines=text.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(function(x){return x.length>3});
   const scored=marketItems.map(function(item){
@@ -69,34 +72,193 @@ function bestMatches(text){
 }
 
 function lineMatches(text){
+  const lines=text.split(String.fromCharCode(10)).map(function(x){return x.trim()}).filter(function(x){return x.length>3});
   const found=[],used={};
-  buildCandidates(text).forEach(function(line){
-    let top=null;
-    marketItems.forEach(function(item){
-      const sc=scoreLine(line,item);
-      if(!top||sc>top.score)top={item:item,score:sc};
-    });
-    if(!top)return;
-    const shared=sharedTokens(line,top.item);
-    const threshold=(shared>=2)?58:74;
-    if(top.score>=threshold&&!used[top.item.slug]){
+  lines.forEach(function(line){
+    const ranked=marketItems.map(function(item){return {item:item,score:scoreLine(line,item)}});
+    ranked.sort(function(a,b){return b.score-a.score});
+    const top=ranked[0];
+    const sharedHere=sharedTokenCount(line,top.item);
+    const minScore=(sharedHere>=2)?55:72;
+    if(top&&top.score>=minScore&&!used[top.item.slug]){
       used[top.item.slug]=1;
       found.push({name:top.item.name,slug:top.item.slug,line:line,score:top.score});
     }
   });
-  found.sort(function(x,y){return y.score-x.score});
-  return found.slice(0,6);
+  return found;
 }
-function plausibleNames(text){
-  return buildCandidates(text).filter(function(l){
-    const w=l.split(' ').filter(function(x){return x.length>1});
-    return w.length>=2&&w.length<=5&&l.length<=52;
-  }).slice(0,6);
+
+function setSuggestions(items=marketItems){const dl=$('#itemSuggestions');dl.innerHTML='';items.forEach(x=>{const o=document.createElement('option');o.value=x.name;dl.appendChild(o)})}
+function slugify(x){return normalize(x).replaceAll(' ','_')}
+function matchItem(name){
+  const n=normalize(name);
+  let hit=marketItems.find(function(x){return normalize(x.name)===n||normalize(x.nameDe||'')===n});
+  if(!hit)hit=marketItems.find(function(x){
+    const a=normalize(x.name),b=normalize(x.nameDe||'');
+    return a.includes(n)||n.includes(a)||b.includes(n)||n.includes(b);
+  });
+  if(hit)return hit;
+  const slug=slugify(name);
+  return {name:name.trim(),nameDe:name.trim(),slug:slug,base:slug.replace(/_(blueprint|set|systems|chassis|neuroptics|barrel|receiver|stock|blade|handle)$/,'').replaceAll('_','-'),price:10};
 }
+async function loadMarketItems(){
+  const REQ={'de':{Language:'de'},'en':{Language:'en'}};
+  try{
+    const r=await fetch('https://api.warframe.market/v2/items',{headers:{Language:'en',Platform:settings.platform||'pc'}});
+    if(!r.ok)throw new Error(r.status);
+    const body=await r.json();
+    const list=Array.isArray(body.data)?body.data:(body.data&&body.data.items);
+    if(!Array.isArray(list))throw new Error('Format');
+    marketItems=list.map(function(x){
+      const i=x.i18n||{};
+      const en=(i.en&&i.en.name)||x.name||String(x.slug||'').replaceAll('_',' ');
+      const de=(i.de&&i.de.name)||en;
+      return {name:en,nameDe:de,slug:x.slug,base:String(x.slug||'').replaceAll('_','-'),price:10};
+    }).filter(function(x){return x.name&&x.slug});
+    mergeBuiltIns();
+    setSuggestions();
+    console.log('WFM items',marketItems.length);
+  }catch(e){
+    marketItems=[...builtInItems];
+    setSuggestions();
+    console.warn('Itemliste nicht geladen, nutze lokale Liste',e);
+  }
+}
+
+function mergeBuiltIns(){
+  const seen={};marketItems.forEach(function(x){seen[x.slug]=1});
+  builtInItems.forEach(function(b){if(!seen[b.slug])marketItems.push(b)});
+}
+
+// Deutsche Bezeichnung des aktuellen Marktsprache-Eintrags, falls vorhanden
+function aliasList(item){return [item.name,item.nameDe].filter(Boolean)}
+function showResult(name){if(!name.trim()){toast('Bitte einen Gegenstand eingeben');return}current=matchItem(name);$('#resultName').textContent=current.name;$('#resultSlug').textContent=current.slug;$('#resultInitial').textContent=current.name[0].toUpperCase();$('#priceInput').value=current.price||10;$('#resultPrice').textContent=current.price||10;$('#quantityInput').value=1;$('#notesInput').value='';$('#marketLink').href=`https://warframe.market/items/${current.slug}?type=sell`;$('#overframeLink').href=`https://overframe.gg/items/all/?q=${encodeURIComponent(current.base.replaceAll('-',' '))}`;go('result')}
+
+function preprocessImage(file){
+  return new Promise(function(resolve,reject){
+    const img=new Image();
+    img.onload=function(){
+      const max=2000,scale=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+      const ctx=c.getContext('2d');
+      ctx.drawImage(img,0,0,c.width,c.height);
+      const d=ctx.getImageData(0,0,c.width,c.height),p=d.data;
+      for(let i=0;i<p.length;i+=4){
+        const r=p[i],g=p[i+1],bl=p[i+2];
+        const mx=Math.max(r,g,bl),mn=Math.min(r,g,bl);
+        const warm=(mx-mn)>45&&r>=g&&g>=bl&&bl<mx*0.82&&(r+g)/2-bl>30;
+        if(warm){p[i]=p[i+1]=p[i+2]=0;continue}
+        const luma=0.299*r+0.587*g+0.114*bl;
+        const v=luma>150?255:(luma<75?0:Math.min(255,Math.max(0,(luma-128)*1.9+128)));
+        p[i]=p[i+1]=p[i+2]=v;
+      }
+      ctx.putImageData(d,0,0);
+      c.toBlob(resolve,'image/png');
+    };
+    img.onerror=reject;
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+async function runOCR(file){const status=$('#ocrStatus'),txt=$('#ocrStatusText'),spin=status.querySelector('.spinner');status.className='ocr-status';spin.hidden=false;txt.textContent='Texterkennung wird vorbereitet...';$('#lookupBtn').disabled=true;try{if(!window.Tesseract)throw new Error('OCR-Bibliothek konnte nicht geladen werden. Prüfe die Internetverbindung.');const processed=await preprocessImage(file);const worker=await Tesseract.createWorker('eng+deu',1,{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',langPath:'https://tessdata.projectnaptha.com/4.0.0',logger:m=>{if(m.status==='recognizing text')txt.textContent=`Text wird erkannt: ${Math.round((m.progress||0)*100)} %`;else txt.textContent=m.status==='loading tesseract core'?'OCR-Engine wird geladen...':'Sprachdaten werden geladen...'}});const result=await worker.recognize(processed);await worker.terminate();const raw=result.data.text||'';$('#ocrRawText').textContent=raw||'Kein Text erkannt.';const matches=bestMatches(raw);if(matches[0]&&matches[0].score>=35){$('#recognizedName').value=matches[0].item.name;status.classList.add('success');txt.textContent=`Erkannt: ${matches[0].item.name} (${Math.min(99,matches[0].score)} % Übereinstimmung)`;showCandidates(matches)}else{status.classList.add('error');txt.textContent='Kein sicherer Itemname erkannt. Bitte Namen eingeben oder ein klareres Foto verwenden.';showCandidates(matches.filter(x=>x.score>10))}}catch(e){status.classList.add('error');txt.textContent=e.message||'Texterkennung fehlgeschlagen. Bitte Namen manuell eingeben.';console.error(e)}finally{spin.hidden=true;$('#lookupBtn').disabled=false}}
+function showCandidates(matches){let box=$('#candidateList');if(!box){box=document.createElement('div');box.id='candidateList';box.className='candidate-list';$('#ocrStatus').after(box)}box.innerHTML=matches.slice(0,3).map((x,i)=>`<button class="candidate-button" data-candidate="${encodeURIComponent(x.item.name)}">${i===0?'<b>Vorschlag:</b> ':''}${x.item.name}</button>`).join('');$$('[data-candidate]').forEach(b=>b.onclick=()=>{$('#recognizedName').value=decodeURIComponent(b.dataset.candidate)})}
+
+$('#manualBtn').onclick=()=>{$('#manualModal').hidden=false;$('#manualName').focus()};$('#closeModal').onclick=()=>$('#manualModal').hidden=true;$('#manualModal').onclick=e=>{if(e.target===$('#manualModal'))$('#manualModal').hidden=true};$('#manualLookup').onclick=()=>{$('#manualModal').hidden=true;showResult($('#manualName').value)};$('#manualName').onkeydown=e=>{if(e.key==='Enter')$('#manualLookup').click()};
+function openCamera(){$('#cameraInput').click()}$('#navScan').onclick=openCamera;
+$('#cameraInput').onchange=e=>{const f=e.target.files[0];if(!f)return;currentFile=f;$('#previewImage').src=URL.createObjectURL(f);$('#recognizedName').value='';$('#ocrRawText').textContent='Erkennung läuft...';go('scan');runOCR(f)};
+$('#lookupBtn').onclick=()=>showResult($('#recognizedName').value);$('#recognizedName').onkeydown=e=>{if(e.key==='Enter')$('#lookupBtn').click()};$('#priceInput').oninput=e=>$('#resultPrice').textContent=e.target.value||0;
+$('#saveItemBtn').onclick=()=>{const qty=Math.max(1,Number($('#quantityInput').value)||1),price=Math.max(1,Number($('#priceInput').value)||1);inventory.unshift({id:Date.now(),name:current.name,slug:current.slug,base:current.base,price,qty,notes:$('#notesInput').value,date:new Date().toISOString()});save();toast('Zum Inventar hinzugefügt');go('inventory')};
+function render(){const count=inventory.reduce((a,x)=>a+x.qty,0),total=inventory.reduce((a,x)=>a+x.qty*x.price,0);$('#itemCount').textContent=count;$('#totalValue').textContent=total.toLocaleString('de-DE');renderList($('#recentList'),inventory.slice(0,3),true);const q=($('#inventorySearch')?.value||'').toLowerCase();renderList($('#inventoryList'),inventory.filter(x=>x.name.toLowerCase().includes(q)),false)}
+function renderList(el,items,compact){if(!el)return;if(!items.length){el.innerHTML='<div class="empty">Noch keine Gegenstände gespeichert.</div>';return}el.innerHTML=items.map(x=>`<article class="item-row"><div class="mini-icon">${x.name[0]}</div><div><h4>${x.name}</h4><p>${x.qty} Stück${x.notes?' · '+x.notes:''}</p></div><div class="row-price">${x.price*x.qty} p${compact?'':`<button class="delete" data-delete="${x.id}" aria-label="Löschen">Löschen</button>`}</div></article>`).join('');$$('[data-delete]').forEach(b=>b.onclick=()=>{inventory=inventory.filter(x=>x.id!==Number(b.dataset.delete));save();toast('Eintrag gelöscht')})}
+$('#inventorySearch').oninput=render;$('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(inventory,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tenno-vault-inventar.json';a.click();URL.revokeObjectURL(a.href)};
+$('#platformSelect').value=settings.platform;$('#platformSelect').onchange=e=>{settings.platform=e.target.value;localStorage.setItem('tennoSettings',JSON.stringify(settings));loadMarketItems();toast('Plattform gespeichert')};
+$('#loadDemoBtn').onclick=()=>{inventory=[{id:1,...builtInItems[0],qty:2,notes:'Rang 10',date:new Date().toISOString()},{id:2,...builtInItems[6],qty:1,notes:'',date:new Date().toISOString()},{id:3,...builtInItems[11],qty:3,notes:'',date:new Date().toISOString()}];save();toast('Demo-Inventar geladen');go('home')};$('#clearBtn').onclick=()=>{if(confirm('Alle lokal gespeicherten Gegenstände löschen?')){inventory=[];save();toast('Lokale Daten gelöscht')}};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});setSuggestions();loadMarketItems();render();
+
+// ===== V5: Belohnungen aus Foto ermitteln =====
+let session=[], priceCache=new Map(), relicPhotos=[];
+
+async function fetchTopPrice(item){
+  const key=item.slug;
+  if(priceCache.has(key))return priceCache.get(key);
+  const res={slug:key,price:null,source:'unbekannt',error:null};
+  try{
+    const r=await fetch('https://api.warframe.market/v2/orders/item/'+encodeURIComponent(key)+'/top',
+      {headers:{Language:'en',Platform:settings.platform||'pc',Crossplay:'true'}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const body=await r.json();
+    const sell=(body.data&&body.data.sell)||[];
+    const ingame=sell.filter(function(o){return String(o.user&&o.user.status).toLowerCase()==='ingame'});
+    const pool=(ingame.length?ingame:sell).filter(function(o){return Number(o.platinum)>0});
+    if(pool.length){
+      const lows=pool.map(function(o){return Number(o.platinum)}).sort(function(a,b){return a-b});
+      // zweitniedrigster Wert, wenn mindestens 3 Angebote vorliegen: faengt Ausreisser nach unten ab
+      res.price=(lows.length>=3)?lows[1]:lows[0];
+      res.low=lows[0];res.count=lows.length;res.source='live';
+    }else{res.error='Keine Verkaufsangebote'}
+  }catch(e){
+    const local=marketItems.find(function(x){return x.slug===key});
+    if(local&&local.price){res.price=local.price;res.source='schaetzung'}
+    else{res.error='Preis nicht abrufbar'}
+  }
+  priceCache.set(key,res);return res;
+}
+
+function renderThumbs(){
+  const box=$('#relicThumbs');
+  if(!box)return;
+  if(!relicPhotos.length){box.innerHTML='<span class="thumb-empty">Noch kein Foto aufgenommen.</span>';return}
+  box.innerHTML=relicPhotos.map(function(p,i){return '<img src="'+p+'" alt="Belohnungsfoto '+(i+1)+'">'}).join('');
+}
+
+function addPhoto(url){
+  relicPhotos.push(url);
+  shotCount=relicPhotos.length;
+  renderThumbs();
+}
+
+async function readOnePhoto(blob,label){
+  if(!window.Tesseract)throw new Error('OCR-Bibliothek nicht geladen');
+  const processed=await preprocessImage(blob);
+  const worker=await Tesseract.createWorker('eng+deu',1,{
+    workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+    corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',
+    langPath:'https://tessdata.projectnaptha.com/4.0.0',
+    logger:function(m){if(m.status==='recognizing text')setRelicStatus(label+' wird gelesen: '+Math.round((m.progress||0)*100)+' %')}
+  });
+  const result=await worker.recognize(processed);
+  await worker.terminate();
+  return (result.data.text||'');
+}
+
+let lastRawText='';
+function showRawText(){
+  let box=$('#relicRawBox');
+  if(!box){
+    box=document.createElement('details');
+    box.id='relicRawBox';box.className='ocr-details';
+    box.innerHTML='<summary>Gelesenen Text anzeigen</summary><pre id="relicRawPre"></pre>';
+    const anchor=$('#relicResult');
+    anchor.parentNode.insertBefore(box,anchor);
+  }
+  $('#relicRawPre').textContent=lastRawText||'Kein Text gelesen.';
+}
+
+function setRelicStatus(text,cls){
+  const box=$('#relicResult');
+  if(box)box.innerHTML='<div class="progress-note">'+text+'</div>';
+}
+
+// Aus dem Rohtext alle Zeilen ziehen, die einem Itemnamen sehr ähnlich sind
 function extractNames(raw){
   const hits=lineMatches(raw);
   if(hits.length)return {names:hits.map(function(h){return h.name}),certain:true};
-  return {names:plausibleNames(raw),certain:false};
+  const fallback=buildCandidates(raw).filter(function(l){
+    const w=l.split(' ').filter(function(x){return x.length>1});
+    return w.length>=2&&w.length<=5&&l.length<=52;
+  }).slice(0,6);
+  return {names:fallback,certain:false};
 }
 
 async function judgeRelics(){
@@ -174,7 +336,7 @@ async function handleRelicPhotos(files){
   const list=[].slice.call(files||[]);
   if(!list.length)return;
   go('relic');
-  let allNames=[],unsure=false;
+  let allNames=[];
   for(let i=0;i<list.length;i++){
     const f=list[i];
     addPhoto(URL.createObjectURL(f));
@@ -182,11 +344,10 @@ async function handleRelicPhotos(files){
     try{
       const raw=await readOnePhoto(f,'Foto '+(i+1));
       lastRawText=raw;
-      lastRawText=raw;
-      const res=extractNames(raw);
-      if(!res.certain)unsure=true;
-      res.names.forEach(function(n){if(allNames.indexOf(n)<0)allNames.push(n)});
-      $('#relicInput').value=allNames.join(String.fromCharCode(10));
+      const names=extractNames(raw);
+      names.forEach(function(n){if(allNames.indexOf(n)<0)allNames.push(n)});
+      const box=$('#relicInput');
+      box.value=allNames.join(String.fromCharCode(10));
     }catch(e){
       setRelicStatus('Foto '+(i+1)+' konnte nicht gelesen werden: '+(e.message||e));
       console.error(e);
